@@ -10,7 +10,6 @@ library(patchwork)
 #https://alz-journals.onlinelibrary.wiley.com/doi/10.1002/alz.13859
 source("./slidingWindowFuncs.R")
 source("./DABNI_maximizingAPOE.R")
-mcrt_thresh <- 28
 #Core 1, Amyloid: Amyloid PET
 #Core 1, T1: p-Tau217
 #Core 2, T2: Tau PET, ABCDS Only
@@ -156,12 +155,12 @@ ABCDS_CL$CL_positive <- ifelse(ABCDS_CL$WUSTLcentiloid > CL_thresh_ABCDS, 1, 0)
 ABCDS_Hipp$hippo_positive <- ifelse(ABCDS_Hipp$hippo_Z < hippo_thresh_ABCDS, 1, 0)
 
 DABNI_dx$mcrt_dementia <- ifelse(DABNI_dx$crt_rli_rfi_total < 23, 1, 0)
-DABNI_dx$mcrt_MCI <- ifelse(DABNI_dx$crt_rli_rfi_total < mcrt_thresh & DABNI_dx$crt_rli_rfi_total > 22, 1, 0)
-DABNI_dx$mcrt_impaired <- ifelse(DABNI_dx$crt_rli_rfi_total < mcrt_thresh, 1, 0)
+DABNI_dx$mcrt_MCI <- ifelse(DABNI_dx$crt_rli_rfi_total < 28 & DABNI_dx$crt_rli_rfi_total > 22, 1, 0)
+DABNI_dx$mcrt_impaired <- ifelse(DABNI_dx$crt_rli_rfi_total < 28, 1, 0)
 
 ABCDS$mcrt_dementia <- ifelse(ABCDS$trs < 23, 1, 0)
-ABCDS$mcrt_MCI <- ifelse(ABCDS$trs < mcrt_thresh & ABCDS$trs > 22, 1, 0)
-ABCDS$mcrt_impaired <- ifelse(ABCDS$trs < mcrt_thresh, 1, 0)
+ABCDS$mcrt_MCI <- ifelse(ABCDS$trs < 28 & ABCDS$trs > 22, 1, 0)
+ABCDS$mcrt_impaired <- ifelse(ABCDS$trs < 28, 1, 0)
 
 DABNI_CSF <- DABNI[!is.na(DABNI$CSF_AB142_A0010),]
 DABNI_CSF <- DABNI_CSF %>% rename(ID = NHC, Age = Age_at_CSF, APOE_grouped = APOE_grouped,
@@ -742,7 +741,7 @@ results_dx_bs$APOE_grouped <- factor(results_dx_bs$APOE_grouped, levels = c("APO
 
 p1 <- get_bs_plot(results_CL_bs[!is.na(results_CL_bs$APOE_grouped),])+ ggtitle("A. Amyloid PET")
 p2 <- get_bs_plot(results_Hippo_bs[!is.na(results_Hippo_bs$APOE_grouped),])+ ggtitle("B. Hippocampal Volume")
-p3 <- get_bs_plot(results_mcrt_impaired_bs[!is.na(results_mcrt_impaired_bs$APOE_grouped),])+ ggtitle(" MCRT Total Score < 28")
+p3 <- get_bs_plot(results_mcrt_impaired_bs[!is.na(results_mcrt_impaired_bs$APOE_grouped),])+ ggtitle("C. MCRT Total Score < 28")
 p4 <- get_bs_plot(results_dx_bs[!is.na(results_dx_bs$APOE_grouped),])+ ggtitle("D. Cognitive Impairment")
 
 final_plot <- p1 | p2 | p3 | p4
@@ -839,4 +838,27 @@ final_plot_ptau <- p1 | p2
 final_plot_ptau
 
 graph2ppt(file = "./figures/Supp_Prevalence_pTau217.pptx", width = 10, height = 5.78)
+
+
+
+
+p1 <- get_hist_of_counts(results_CSF_grouped_bs[results_CSF_grouped_bs$Group %in% c("FEMALEAPOE2", "FEMALEAPOE4",
+                                                                                    "MALEAPOE2", "MALEAPOE4"),]) + ggtitle("A. CSF AB42/AB40") 
+p2 <- get_hist_of_counts(results_CL_grouped_bs[results_CL_grouped_bs$Group %in% c("FEMALEAPOE2", "FEMALEAPOE4",
+                                                                                  "MALEAPOE2",  "MALEAPOE4"),]) + ggtitle("B. Amyloid PET") 
+p3 <- get_hist_of_counts(results_pTau_DABNI_bs[results_pTau_DABNI_bs$Group %in% c("FEMALEAPOE2", "FEMALEAPOE4",
+                                                                                  "MALEAPOE2", "MALEAPOE4"),]) + ggtitle("C. Plasma pTau217 - AlzPATH") 
+p4 <- get_hist_of_counts(results_pTau_ABCDS_bs[results_pTau_ABCDS_bs$Group %in% c("FEMALEAPOE2",  "FEMALEAPOE4",
+                                                                                  "MALEAPOE2",  "MALEAPOE4"),]) + ggtitle("D. Plasma pTau217 - Lilly") 
+p5 <- get_hist_of_counts(results_GFAP_grouped_bs[results_GFAP_grouped_bs$Group %in% c("FEMALEAPOE2",  "FEMALEAPOE4",
+                                                                                      "MALEAPOE2", "MALEAPOE4"),]) + ggtitle("E. Plasma GFAP") 
+p6 <- get_hist_of_counts(results_NFL_grouped_bs[results_NFL_grouped_bs$Group %in% c("FEMALEAPOE2", "FEMALEAPOE4",
+                                                                                    "MALEAPOE2", "MALEAPOE4"),]) + ggtitle("F. Plasma NFL") 
+p7 <- get_hist_of_counts(results_Hippo_grouped_bs[results_Hippo_grouped_bs$Group %in% c("FEMALEAPOE2","FEMALEAPOE4",
+                                                                                        "MALEAPOE2", "MALEAPOE4"),])+ ggtitle("G. Hippocampal Volume")
+p8 <- get_hist_of_counts(results_mcrt_grouped_bs[results_mcrt_grouped_bs$Group %in% c("FEMALEAPOE2",  "FEMALEAPOE4",
+                                                                                      "MALEAPOE2", "MALEAPOE4"),])+ ggtitle("H. mCRT")
+lemon::grid_arrange_shared_legend(p1 ,p2, p3, p4, p5, p6, p7, p8, nrow = 4, ncol = 2)
+graph2ppt(file = "./figures/Prevalence_by_APOE_SEX_allBiomarkers_noAPOE3_forSupplement.pptx", width = 5, height = 5.78)
+
 

@@ -328,6 +328,7 @@ vars <- c("de_gender", "APOE", "clinical_AgefromBaseline", "dx_grouped",
 catVars <- c("de_gender", "APOE", "dx_grouped",
              "hasCL", "hasCSF", "haspTau217", "hasGFAP", "hasNFL", "hasMRI", "hasmCRT", "hasDX")
 CreateTableOne(vars = vars, factorVars = catVars, strata = "cohort", data = df)
+CreateTableOne(vars = vars, factorVars = catVars, strata = "APOE_grouped", data = df)
 
 
 df$gender_APOE <- as.factor(paste0(df$de_gender, df$APOE_grouped))
@@ -336,8 +337,6 @@ vars <- c( "clinical_AgefromBaseline", "dx_grouped",
 catVars <- c("dx_grouped",
              "hasCL", "hasCSF", "haspTau217", "hasGFAP", "hasNFL", "hasMRI", "hasmCRT", "hasDX", "cohort")
 CreateTableOne(vars = vars, factorVars = catVars, strata = "gender_APOE", data = df)
-
-CreateTableOne(vars = vars, factorVars = catVars, strata = "APOE_grouped", data = df)
 
 
 
@@ -431,26 +430,26 @@ graph2ppt(file = "./figures/Fig3_Analog_forSupp_ABCDSonly.pptx", width = 8, heig
 plot_group_proportions(df[df$cohort == "DABNI",],"APOE_grouped", group_levels, VALS = values, LABS = labels)
 graph2ppt(file = "./figures/Fig3_Analog_forSupp_DABNIonly.pptx", width = 8, height = 8)
 
-
-library(mgcv)
-df$APOE_grouped <- factor(df$APOE_grouped, levels = c("APOE2", "APOE3", "APOE4"))
-res_CSF <- run_apoe_model(
-  df = df,
-  apoe_col = "APOE_grouped",
-  y_col = "CSFAB42AB40",
-  fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
-  colour_values = c("#3399FF", "#33CC33", "#FF4D4D")
-)
-res_CL <- run_apoe_model(
-  df = df,
-  apoe_col = "APOE_grouped",
-  y_col = "WUSTLcentiloid",
-  fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
-  colour_values = c("#3399FF", "#33CC33", "#FF4D4D")
-)
-
-res_CL$p
-res_CL$summary_table
+# 
+# library(mgcv)
+# df$APOE_grouped <- factor(df$APOE_grouped, levels = c("APOE2", "APOE3", "APOE4"))
+# res_CSF <- run_apoe_model(
+#   df = df,
+#   apoe_col = "APOE_grouped",
+#   y_col = "CSFAB42AB40",
+#   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
+#   colour_values = c("#3399FF", "#33CC33", "#FF4D4D")
+# )
+# res_CL <- run_apoe_model(
+#   df = df,
+#   apoe_col = "APOE_grouped",
+#   y_col = "WUSTLcentiloid",
+#   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
+#   colour_values = c("#3399FF", "#33CC33", "#FF4D4D")
+# )
+# 
+# res_CL$p
+# res_CL$summary_table
 # 
 # 
 # res_GFAP <- run_apoe_model(

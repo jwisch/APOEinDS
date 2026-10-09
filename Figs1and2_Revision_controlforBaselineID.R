@@ -16,6 +16,7 @@ source("./corrections_ABCDS.R")
 source("./code_to_plot.R")
 source("./Fig1_otherfuncs.R")
 source("./Revision_functions.R")
+source("./slidingWindowFuncs.R")
 
 ################################################################################
 ##ABCDS
@@ -245,14 +246,8 @@ DABNI_CSF$NHC <- as.factor(DABNI_CSF$NHC)
 DABNI_CSF$Sex <- as.factor(DABNI_CSF$Sex)
 DABNI_CSF$APOE_grouped <- relevel(factor(DABNI_CSF$APOE_grouped), ref = "APOE3")
 
-DABNI_CSF$APOE_grouped <- factor(DABNI_CSF$APOE_grouped, levels = c("APOE2", "APOE3", "APOE4"))
 
-ggplot(DABNI_CSF, aes(x = CSFAB42_AB40, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "bottom") + xlab("CSF AB42/AB40") + ylab("") + scale_x_reverse()
-graph2ppt(file = "./figures/SuppFig_HistogrambYAPOE_CSFAB42AB40.pptx", width = 1.8, height = 1.8)
+
 
 diagnostics_CSF <- evaluate_gam_k_selection(DABNI_CSF, y_col="CSFAB42_AB40", age_col="Age_at_CSF", 
                                             apoe_col="APOE_grouped", intellectual_disability_col <- "Intellectual_Disability")
@@ -273,6 +268,15 @@ res_CSF <- run_apoe_model_cohort(
 ) 
 
 p1 <- res_CSF[[1]] + xlab("Age") + ylab("CSF AB42/AB40") + scale_shape_manual(values = c(1, 1, 4))
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_CSF$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
+
 
 res_CSF_sex <- run_apoe_model_cohort(
   DABNI_CSF,
@@ -332,31 +336,9 @@ CL$Subject <- as.factor(CL$Subject)
 CL <- CL[!is.na(CL$amy_AgefromBaseline),]
 CL$cohort <- factor(CL$cohort, levels = c("DABNI", "ABCDS"))
 CL$APOE_grouped <- relevel(factor(CL$APOE_grouped), ref = "APOE3")
-CL$APOE_grouped <- factor(CL$APOE_grouped, levels = c("APOE2", "APOE3", "APOE4"))
+
 ggplot(CL, aes(x = WUSTLcentiloid, colour = cohort, group = cohort, fill = cohort)) + geom_histogram(alpha = 0.5, position = "identity") + theme_bw() +
   theme(legend.position = "bottom")
-
-p1_hist <- ggplot(CL, aes(x = WUSTLcentiloid, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Cortical Amyloid Burden (CL)") + ylab("") + ggtitle("Combined Cohorts")
-p2_hist <- ggplot(CL[CL$cohort == "DABNI",], aes(x = WUSTLcentiloid, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Cortical Amyloid Burden (CL)") + ylab("") + ggtitle("DABNI Only")
-p3_hist <- ggplot(CL[CL$cohort == "ABCDS",], aes(x = WUSTLcentiloid, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Cortical Amyloid Burden (CL)") + ylab("") + ggtitle("ABCDS Only")
-layout_matrix <- rbind(c(1, 1, 2), c(1, 1, 3))
-grid.arrange(p1_hist, p2_hist, p3_hist, layout_matrix = layout_matrix)
-graph2ppt(file = "./figures/SuppFig_HistogrambYAPOE_CL.pptx", width = 4, height = 4)
-
-
-
 
 gam_select_CL <- evaluate_gam_k_selection(df = CL, y_col = "WUSTLcentiloid", 
                                           age_col = "amy_AgefromBaseline", 
@@ -371,28 +353,40 @@ gam_select_CL_sex <- evaluate_gam_k_selection(df = CL, y_col = "WUSTLcentiloid",
                                           sex_col = "de_gender",
                                           cohort = "cohort") 
 
+
+CL$WUSTLcentiloid_shift <- CL$WUSTLcentiloid - min(CL$WUSTLcentiloid, na.rm = TRUE) + 0.1
 res_CL_cohort <- run_apoe_model_cohort(
   df = CL,
   apoe_col = "APOE_grouped",
   age_col = "amy_AgefromBaseline",
-  y_col = "WUSTLcentiloid",
+  y_col = "WUSTLcentiloid_shift",
   intellectual_disability_col = "Intellectual_Disability",
   cohort = "cohort",
   reference_apoe = "APOE3",
+  family_choice = Gamma(link = "log"),
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   k_val = 4
 )
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_CL_cohort$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
 
 res_CL_cohort_sex <- run_apoe_model_cohort(
   df = CL,
   apoe_col = "APOE_grouped",
   age_col = "amy_AgefromBaseline",
-  y_col = "WUSTLcentiloid",
+  y_col = "WUSTLcentiloid_shift",
   intellectual_disability_col = "Intellectual_Disability",
   cohort = "cohort",
   reference_apoe = "APOE3",
-  reference_sex = "M",                                  
+  reference_sex = "M",  
+  family_choice = Gamma(link = "log"),
+  
   sex = "de_gender",
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
@@ -416,8 +410,6 @@ export_gam_summary_to_excel(
 ###############################################################################
 ##pTau217
 ###############################################################################
-
-
 gam_select_ptau217_DABNI <- evaluate_gam_k_selection(  df = DABNI,
                                                        apoe_col = "APOE_grouped",
                                                        age_col = "Age_at_CSF",
@@ -430,19 +422,25 @@ gam_select_ptau217_DABNI_sex <- evaluate_gam_k_selection(  df = DABNI,
                                                            
                                                            y_col = "PLASMA_PTAU217_S0217",
                                                            sex_col = "Sex", k_range = 3:10)
-
 res_ptau217_DABNI <- run_apoe_model_cohort(
   df = DABNI,
   apoe_col = "APOE_grouped",
   age_col = "Age_at_CSF",
   y_col = "PLASMA_PTAU217_S0217",
   intellectual_disability_col = "Intellectual_Disability",
+  family_choice = Gamma(link = "log"),
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   markSig = FALSE,
   k = 5
 )
 
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_ptau217_DABNI$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
 
 res_ptau217_DABNI_sex <- run_apoe_model_cohort(
   df = DABNI,
@@ -451,14 +449,19 @@ res_ptau217_DABNI_sex <- run_apoe_model_cohort(
   y_col = "PLASMA_PTAU217_S0217",
   intellectual_disability_col = "Intellectual_Disability",
   reference_sex = "M",                                  
-  
+  family_choice = Gamma(link = "log"),
   sex_col = "Sex",
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   markSig = FALSE,
   k = 5
 )
-
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_ptau217_DABNI_sex$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
 summary(res_ptau217_DABNI_sex$model_obj)
 export_gam_summary_to_excel(
   gam_summary = res_ptau217_DABNI$model_obj, 
@@ -479,21 +482,6 @@ pTau217 <- merge(ABCDS[!duplicated(ABCDS$SUBJECT_LABEL), c("SUBJECT_LABEL", "EVE
                  by.x = c("SUBJECT_LABEL", "EVENT_SEQUENCE"),
                  by.y = c("subject_label", "event_sequence"), all = FALSE)
 
-p1_hist <- ggplot(DABNI, aes(x = PLASMA_PTAU217_S0217, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Plasma pTau217 [AlzPATH]") + ylab("") + ggtitle("DABNI Only")
-p2_hist <- ggplot(pTau217, aes(x = pTau217, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Plasma pTau217 [Lilly]") + ylab("") + ggtitle("ABCDS Only")
-grid.arrange(p1_hist, p2_hist, nrow = 2, ncol = 1)
-graph2ppt(file = "./figures/SuppFig_HistogrambYAPOE_pTau217.pptx", width = 4, height = 4)
-
-
-
 gam_select_ptau217_ABCDS <- evaluate_gam_k_selection(  df = pTau217,
                                                        apoe_col = "APOE_grouped",
                                                        age_col = "clinical_AgefromBaseline",
@@ -508,33 +496,49 @@ gam_select_ptau217_ABCDS_sex <- evaluate_gam_k_selection(  df = pTau217,
                                                            sex_col = "de_gender",
                                                            y_col = "pTau217", k_range = 3:10)
 
-
+pTau217$de_gender <- as.factor(pTau217$de_gender)
+levels(pTau217$de_gender) <- c("M", "F")
 res_ptau217_ABCDS <- run_apoe_model_cohort(
   df = pTau217,
   apoe_col = "APOE_grouped",
   age_col = "clinical_AgefromBaseline",
   y_col = "pTau217",
   intellectual_disability_col = "Intellectual_Disability",
-  
+  family_choice = Gamma(link = "log"),
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   markSig = FALSE,
   k = 4
 )
 res_ptau217_ABCDS_sex <- run_apoe_model_cohort(
-  df = pTau217,
+  df = pTau217[!is.na(pTau217$de_gender),],
   apoe_col = "APOE_grouped",
   age_col = "clinical_AgefromBaseline",
   y_col = "pTau217",
   sex_col = "de_gender",
   intellectual_disability_col = "Intellectual_Disability",
   reference_sex = "M",                                  
+  family_choice = Gamma(link = "log"),
   
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   markSig = FALSE,
-  k = 4
+  k_val = 4
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_ptau217_ABCDS$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_ptau217_ABCDS_sex$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
 
 export_gam_summary_to_excel(
   gam_summary = res_ptau217_ABCDS$model_obj, 
@@ -573,27 +577,6 @@ GFAP$cohort <- factor(GFAP$cohort, levels = c("DABNI", "ABCDS"))
 GFAP$de_gender <- as.factor(GFAP$de_gender)
 levels(GFAP$de_gender) <- c("M", "F", "F", "M")
 
-p1_hist <- ggplot(GFAP, aes(x = TESTVALUE, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Plasma GFAP") + ylab("") + ggtitle("Combined Cohorts") + xlim(c(0, 1700))
-p2_hist <- ggplot(GFAP[GFAP$cohort == "DABNI",], aes(x = TESTVALUE, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Plasma GFAP") + ylab("") + ggtitle("Combined Cohorts")+ xlim(c(0, 1700))
-p3_hist <- ggplot(GFAP[GFAP$cohort == "ABCDS",], aes(x = TESTVALUE, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Plasma GFAP") + ylab("") + ggtitle("Combined Cohorts")+ xlim(c(0, 1700))
-layout_matrix <- rbind(c(1, 1, 2), c(1, 1, 3))
-grid.arrange(p1_hist, p2_hist, p3_hist, layout_matrix = layout_matrix)
-graph2ppt(file = "./figures/SuppFig_HistogrambYAPOE_GFAP.pptx", width = 4, height =4)
-
-
-
 
 gam_select_GFAP <- evaluate_gam_k_selection(df = GFAP, y_col = "TESTVALUE", 
                                           age_col = "clinical_AgefromBaseline", 
@@ -612,6 +595,8 @@ res_GFAP_cohort <- run_apoe_model_cohort(
   y_col = "TESTVALUE",
   intellectual_disability_col = "Intellectual_Disability",
   cohort = "cohort",
+  family_choice = Gamma(link = "log"),
+  
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   k = 5
@@ -625,12 +610,32 @@ res_GFAP_cohort_sex <- run_apoe_model_cohort(
   y_col = "TESTVALUE",
   cohort = "cohort",
   reference_sex = "M",                                  
+  family_choice = Gamma(link = "log"),
   
   sex_col = "de_gender",
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   k = 5
 )
+
+
+
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_GFAP_cohort$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_GFAP_cohort_sex$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
+
 summary(res_GFAP_cohort_sex$model_obj)
 p3 <- res_GFAP_cohort[[1]] + xlab("Age") + ylab("Plasma GFAP") + scale_shape_manual(values = c(1, 4, 4))
 
@@ -669,28 +674,6 @@ levels(NFL$de_gender) <- c("M", "F", "F", "M")
 
 NFL$TESTVALUE <- log(NFL$TESTVALUE)
 NFL$cohort <- factor(NFL$cohort, levels = c("DABNI", "ABCDS"))
-
-
-p1_hist <- ggplot(NFL, aes(x = TESTVALUE, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("log(Plasma NfL)") + ylab("") + ggtitle("Combined Cohorts") + xlim(c(0, 6))
-p2_hist <- ggplot(NFL[NFL$cohort == "DABNI",], aes(x = TESTVALUE, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("log(Plasma NfL)") + ylab("") + ggtitle("Combined Cohorts")+ xlim(c(0, 6))
-p3_hist <- ggplot(NFL[NFL$cohort == "ABCDS",], aes(x = TESTVALUE, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("log(Plasma NfL)") + ylab("") + ggtitle("Combined Cohorts")+ xlim(c(0, 6))
-layout_matrix <- rbind(c(1, 1, 2), c(1, 1, 3))
-grid.arrange(p1_hist, p2_hist, p3_hist, layout_matrix = layout_matrix)
-graph2ppt(file = "./figures/SuppFig_HistogrambYAPOE_NFL.pptx", width = 4, height = 4)
-
-
 
 gam_select_NFL <- evaluate_gam_k_selection(df = NFL, y_col = "TESTVALUE", 
                                             age_col = "clinical_AgefromBaseline", 
@@ -731,6 +714,15 @@ res_NFL_cohort_sex <- run_apoe_model_cohort(
   k = 4
 )
 
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_NFL_cohort_sex$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
+
+
 summary(res_NFL_cohort_sex$model_obj)
 p4 <- res_NFL_cohort[[1]] + xlab("Age") + ylab("Plasma log(NFL)") + scale_shape_manual(values = c(1, 4, 4))
 
@@ -763,35 +755,6 @@ hippo$APOE_grouped <- as.factor(hippo$APOE_grouped)
 levels(hippo$APOE_grouped) <- c("APOE2", "APOE2", "APOE4",
                                 "APOE3", "APOE4", "APOE4", 
                                 "APOE4", "APOE3", "APOE2")
-
-hippo$APOE_grouped <- factor(hippo$APOE_grouped, levels = c("APOE2", "APOE3", "APOE4"))
-
-p1_hist <- ggplot(hippo, aes(x = hippo_Z, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Hippocampal Volume [Z]") + ylab("") + ggtitle("Combined Cohorts") + xlim(c(-4.7, 2.6))
-p2_hist <- ggplot(hippo[hippo$cohort == "DABNI",], aes(x = hippo_Z, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Hippocampal Volume [Z]") + ylab("") + ggtitle("Combined Cohorts") + xlim(c(-4.7, 2.6))
-p3_hist <- ggplot(hippo[hippo$cohort == "ABCDS",], aes(x = hippo_Z, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Hippocampal Volume [Z]") + ylab("") + ggtitle("Combined Cohorts") + xlim(c(-4.7, 2.6))
-layout_matrix <- rbind(c(1, 1, 2), c(1, 1, 3))
-grid.arrange(p1_hist, p2_hist, p3_hist, layout_matrix = layout_matrix)
-graph2ppt(file = "./figures/SuppFig_HistogrambYAPOE_hippo.pptx", width = 4, height = 4)
-
-
-
-
-
-
-
-
 gam_select_hippo <- evaluate_gam_k_selection(df = hippo, y_col = "hippo_Z", 
                                             age_col = "mri_AgefromBaseline", 
                                             apoe_col = "APOE_grouped", 
@@ -828,6 +791,14 @@ res_hippo_cohort_sex <- run_apoe_model_cohort(
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
   k = 4
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_hippo_cohort_sex$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
 summary(res_hippo_cohort_sex$model_obj)
 p5 <- res_hippo_cohort[[1]] + xlab("Age") + ylab("Hippocampal Volume (Z)") + scale_shape_manual(values = c(1, 4, 4))
 
@@ -877,27 +848,6 @@ mcrt$cohort <- factor(mcrt$cohort, levels = c("DABNI", "ABCDS"))
 mcrt$de_gender <- as.factor(mcrt$de_gender)
 levels(mcrt$de_gender) <- c("M", "F", "F", "M")
 
-
-p1_hist <- ggplot(mcrt, aes(x = trs, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("mCRT") + ylab("") + ggtitle("Combined Cohorts") + xlim(c(-1, 37))
-p2_hist <- ggplot(mcrt[mcrt$cohort == "DABNI",], aes(x = trs, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Hippocampal Volume [Z]") + ylab("") + ggtitle("DABNI Only") + xlim(c(-1, 37))
-p3_hist <- ggplot(mcrt[mcrt$cohort == "ABCDS",], aes(x = trs, group = APOE_grouped, colour = APOE_grouped, fill = APOE_grouped)) + 
-  geom_histogram(position = "identity", alpha = 0.3) +
-  scale_fill_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) +
-  scale_colour_manual(values = c("#3399FF", "#33CC33", "#FF4D4D") ) + theme_bw() +
-  theme(legend.position = "none") + xlab("Hippocampal Volume [Z]") + ylab("") + ggtitle("ABCDS Only") + xlim(c(-1, 37))
-layout_matrix <- rbind(c(1, 1, 2), c(1, 1, 3))
-grid.arrange(p1_hist, p2_hist, p3_hist, layout_matrix = layout_matrix)
-graph2ppt(file = "./figures/SuppFig_HistogrambYAPOE_mcrt.pptx", width = 4, height = 4)
-
-
 gam_select_mcrt <- evaluate_gam_k_selection(df = mcrt, y_col = "trs", 
                                             age_col = "clinical_AgefromBaseline", 
                                             apoe_col = "APOE_grouped", 
@@ -910,17 +860,22 @@ gam_select_mcrt_sex <- evaluate_gam_k_selection(df = mcrt, y_col = "trs",
                                             
                                             cohort = "cohort", 
                                             sex_col = "de_gender", k_range = 3:10)
+
+# 1. Convert score to work with distribution
+mcrt$score_prop <- 36 - mcrt$trs
+
 res_mcrt_cohort <- run_apoe_model_cohort(
   df = mcrt,
   apoe_col = "APOE_grouped",
   age_col = "clinical_AgefromBaseline",
-  y_col = "trs",
+  y_col = "score_prop",
+  family = tw(link = "log"),
   cohort = "cohort",
   intellectual_disability_col = "Intellectual_Disability",
   
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
-  YLIM= c(0, 46),
+  YLIM= c(0, 40),
   k = 5
 )
 
@@ -928,7 +883,8 @@ res_mcrt_cohort_sex <- run_apoe_model_cohort(
   df = mcrt,
   apoe_col = "APOE_grouped",
   age_col = "clinical_AgefromBaseline",
-  y_col = "trs",
+  y_col = "score_prop",
+  family = tw(link = "log"),
   cohort = "cohort",
   reference_sex = "M",                                  
   
@@ -937,9 +893,87 @@ res_mcrt_cohort_sex <- run_apoe_model_cohort(
   
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
   colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
-  YLIM= c(0, 46),
+  YLIM= c(0, 40),
   k = 5
 )
+
+
+# Extract model predictions
+mcrt_pred <- res_mcrt_cohort_sex$predictions
+
+# Transform predictions back to original TRS scale
+mcrt_pred$trs_fit <- 36 - mcrt_pred$forecast
+mcrt_pred$trs_min <- 36 - mcrt_pred$max
+mcrt_pred$trs_max <- 36 - mcrt_pred$min
+
+# Plot original data + model predictions on original TRS scale
+p_mcrt_original <- ggplot2::ggplot(
+  mcrt,
+  ggplot2::aes(
+    x = clinical_AgefromBaseline,
+    y = trs,
+    colour = APOE_grouped,
+    group = APOE_grouped
+  )
+) +
+  ggplot2::geom_point(alpha = 0.3) +
+  ggplot2::geom_ribbon(
+    data = mcrt_pred,
+    ggplot2::aes(
+      x = clinical_AgefromBaseline,
+      y = trs_fit,
+      ymin = trs_min,
+      ymax = trs_max,
+      fill = APOE_grouped
+    ),
+    alpha = 0.4,
+    inherit.aes = FALSE
+  ) +
+  ggplot2::geom_line(
+    data = mcrt_pred,
+    ggplot2::aes(
+      x = clinical_AgefromBaseline,
+      y = trs_fit,
+      colour = APOE_grouped,
+      group = APOE_grouped
+    ),
+    inherit.aes = FALSE
+  ) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(legend.position = "bottom") +
+  ggplot2::scale_fill_manual(
+    values = c("#3399FF", "#33CC33", "#FF4D4D")
+  ) +
+  ggplot2::scale_colour_manual(
+    values = c("#3399FF", "#33CC33", "#FF4D4D")
+  ) +
+  ggplot2::scale_x_continuous(
+    breaks = c(20, 30, 40, 50, 60, 70)
+  ) +
+  ggplot2::coord_cartesian(
+    xlim = c(18, 72),
+    ylim = c(0, 40)
+  ) +
+  ggplot2::xlab("Age") +
+  ggplot2::ylab("modified Cued Recall Test (mCRT)")
+
+p_mcrt_original
+
+
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_mcrt_cohort$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(res_mcrt_cohort_sex$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
 
 summary(res_mcrt_cohort$model_obj)
 
@@ -976,19 +1010,12 @@ lemon::grid_arrange_shared_legend(p1 + aes(shape = APOE_grouped) +
                                     scale_shape_manual(values = c(4, 4, 4), guide = "none") + 
                                     ggtitle("D."),
                                   p3 + ggtitle("E."), p4 + ggtitle("F."), 
-                                  p5 + ggtitle("G."), p6 + ggtitle("H."), nrow = 4, ncol = 2)
+                                  p5 + ggtitle("G."), p_mcrt_original + ggtitle("H."), nrow = 4, ncol = 2)
 
 graph2ppt(file = "./figures/Fig1.pptx", width = 6, height = 11)
-res_ptau217_ABCDS[[1]] + 
-  aes(shape = APOE_grouped) + ylim(c(0, 2)) +
-  scale_shape_manual(values = c(4, 4, 4), guide = "none") + ylab("Biomarker Level") + theme_void() + theme(legend.position= "bottom")
-graph2ppt(file = "./figures/AAIC_exemplar2.pptx", width = 6, height = 5)
-
 
 # res_mcrt_cohort_censoredModel$plot
 # graph2ppt(file = "./figures/SuppMaterials_BetaRegressionformCRT.pptx", width = 6, height = 11)
-p1
-graph2ppt(file = "./figures/AAIC_exemplar2.pptx", width = 6, height = 5)
 
 grid.arrange(diagnostics_CSF$plots$aic_plot + ggtitle("A. CSF AB42/AB40, DABNI"), 
                                   gam_select_CL$plots$aic_plot + ggtitle("B. Amyloid PET"), 
@@ -1082,18 +1109,163 @@ res_hippo <- run_apoe_model_cohort(
   markSig = TRUE,
   k = "3"
 )
-res_mcrt <- run_apoe_model_cohort(
+
+
+# 1. Convert score to work with distribution
+mcrt$score_prop <- 36 - mcrt$trs
+
+res_mcrt_cohort <- run_apoe_model_cohort(
   df = mcrt,
   apoe_col = "APOE_grouped",
   age_col = "clinical_AgefromBaseline",
-  y_col = "trs",
+  y_col = "score_prop",
+  family = tw(link = "log"),
   cohort = "cohort",
+  intellectual_disability_col = "Intellectual_Disability",
+  
   fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
-  colour_values = c("#3399FF", "#33CC33", "#FF4D4D"),
-  markSig = TRUE,
-  k = "7",
-  YLIM = c(0, 46)
+  colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
+  YLIM= c(0, 40),
+  k = 5
 )
+
+res_mcrt_cohort_sex <- run_apoe_model_cohort(
+  df = mcrt,
+  apoe_col = "APOE_grouped",
+  age_col = "clinical_AgefromBaseline",
+  y_col = "score_prop",
+  family = tw(link = "log"),
+  cohort = "cohort",
+  reference_sex = "M",                                  
+  sex_col = "de_gender",
+  intellectual_disability_col = "Intellectual_Disability",
+  
+  fill_values = c("#3399FF", "#33CC33", "#FF4D4D"),
+  colour_values = c( "#33CC33","#3399FF", "#FF4D4D"),
+  YLIM= c(0, 40),
+  k = 5
+)
+
+
+# Extract model predictions
+mcrt_pred <- res_mcrt_cohort_sex$predictions
+
+# Transform predictions back to original TRS scale
+mcrt_pred$trs_fit <- 36 - mcrt_pred$forecast
+mcrt_pred$trs_min  <- 36 - mcrt_pred$max
+mcrt_pred$trs_max  <- 36 - mcrt_pred$min
+
+# Extract significance ranges
+sig <- data.table::copy(res_mcrt_cohort_sex$significance_summary)
+
+# Set y positions for significance bars
+y_range_min <- 0
+y_range_max <- 40
+y_buffer <- (y_range_max - y_range_min) * 0.05
+
+contrast_levels <- unique(sig$contrast)
+
+y_positions <- setNames(
+  seq(
+    from = y_range_max + y_buffer,
+    by = y_buffer,
+    length.out = length(contrast_levels)
+  ),
+  contrast_levels
+)
+
+sig[, y := y_positions[contrast]]
+
+# Plot
+p_mcrt_original_withBars <- ggplot2::ggplot(
+  mcrt,
+  ggplot2::aes(
+    x = clinical_AgefromBaseline,
+    y = trs,
+    colour = APOE_grouped,
+    group = APOE_grouped
+  )
+) +
+  # Raw data
+  ggplot2::geom_point(alpha = 0.3) +
+  
+  # Confidence intervals
+  ggplot2::geom_ribbon(
+    data = mcrt_pred,
+    ggplot2::aes(
+      x = clinical_AgefromBaseline,
+      y = trs_fit,
+      ymin = trs_min,
+      ymax = trs_max,
+      fill = APOE_grouped
+    ),
+    alpha = 0.4,
+    inherit.aes = FALSE
+  ) +
+  
+  # Fitted curves
+  ggplot2::geom_line(
+    data = mcrt_pred,
+    ggplot2::aes(
+      x = clinical_AgefromBaseline,
+      y = trs_fit,
+      colour = APOE_grouped,
+      group = APOE_grouped
+    ),
+    inherit.aes = FALSE
+  ) +
+  
+  # Significance bars
+  ggplot2::geom_segment(
+    data = sig,
+    ggplot2::aes(
+      x = start_age,
+      xend = end_age,
+      y = y,
+      yend = y,
+      colour = contrast
+    ),
+    inherit.aes = FALSE,
+    linewidth = 2
+  ) +
+  
+  ggplot2::theme_bw() +
+  ggplot2::theme(legend.position = "bottom") +
+  
+  ggplot2::scale_fill_manual(
+    values = c(
+      "APOE2" = "#3399FF",
+      "APOE3" = "#33CC33",
+      "APOE4" = "#FF4D4D"
+    )
+  ) +
+  
+  ggplot2::scale_colour_manual(
+    values = c(
+      "APOE2" = "#3399FF",
+      "APOE3" = "#33CC33",
+      "APOE4" = "#FF4D4D",
+      "sig_2_3" = "#BABBB1",
+      "sig_2_4" = "#D67B44",
+      "sig_3_4" = "#514289"
+    )
+  ) +
+
+  
+    ggplot2::scale_x_continuous(
+    breaks = c(20, 30, 40, 50, 60, 70)
+  ) +
+  
+  ggplot2::coord_cartesian(
+    xlim = c(18, 72),
+    ylim = c(0, 50)
+  ) +
+  
+  ggplot2::xlab("Age") +
+  ggplot2::ylab("modified Cued Recall Total (mCRT)")
+
+p_mcrt_original_withBars
+
 
 
 p1 <- res_CSF[[1]]
@@ -1303,6 +1475,14 @@ export_gam_summary_to_excel(
   file_path   = "./SuppMaterials/Supplemental_Table_CSF_by_APOE_and_sex.xlsx", 
   model_label = "Supplemental Table X: GAM Trajectories of CSF AB42/AB40 by APOE and Sex"
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_CSF$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
 apoe_sex_CL <- run_apoe_sex_model_cohort(
   df = CL,
   apoe_col = "APOE_grouped",
@@ -1323,6 +1503,13 @@ export_gam_summary_to_excel(
   model_label = "Supplemental Table X: GAM Trajectories of Amyloid PET by APOE and Sex"
 )
 
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_CL$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
 apoe_sex_pTau217_DABNI <- run_apoe_sex_model_cohort(
   df = DABNI,
   apoe_col = "APOE_grouped",
@@ -1342,6 +1529,15 @@ export_gam_summary_to_excel(
   file_path   = "./SuppMaterials/Supplemental_Table_PlasmapTau217_DABNI_by_APOE_and_sex.xlsx", 
   model_label = "Supplemental Table X: GAM Trajectories of Plasma pTau217 in DABNI by APOE and Sex"
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_pTau217_DABNI$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
+
 apoe_sex_pTau217_ABCDS <- run_apoe_sex_model_cohort(
   df = pTau217,
   apoe_col = "APOE_grouped",
@@ -1361,6 +1557,14 @@ export_gam_summary_to_excel(
   model_label = "Supplemental Table X: GAM Trajectories of Plasma pTau217 in ABCDS by APOE and Sex"
 )
 
+
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_pTau217_ABCDS$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
 apoe_sex_GFAP <- run_apoe_sex_model_cohort(
   df = GFAP,
   apoe_col = "APOE_grouped",
@@ -1381,6 +1585,13 @@ export_gam_summary_to_excel(
   file_path   = "./SuppMaterials/Supplemental_Table_PlasmaGFAP_by_APOE_and_sex.xlsx", 
   model_label = "Supplemental Table X: GAM Trajectories of Plasma GFAP by APOE and Sex"
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_GFAP$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
 apoe_sex_NFL <- run_apoe_sex_model_cohort(
   df = NFL,
   apoe_col = "APOE_grouped",
@@ -1401,6 +1612,14 @@ export_gam_summary_to_excel(
   file_path   = "./SuppMaterials/Supplemental_Table_PlasmaNFL_by_APOE_and_sex.xlsx", 
   model_label = "Supplemental Table X: GAM Trajectories of Plasma NFL by APOE and Sex"
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_NFL$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+
 apoe_sex_hippo <- run_apoe_sex_model_cohort(
   df = hippo,
   apoe_col = "APOE_grouped",
@@ -1421,20 +1640,30 @@ export_gam_summary_to_excel(
   file_path   = "./SuppMaterials/Supplemental_Table_hippo_by_APOE_and_sex.xlsx", 
   model_label = "Supplemental Table X: GAM Trajectories of Hippocampal Volume by APOE and Sex"
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_hippo$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
+mcrt$trs_beta <- (mcrt$trs - min(mcrt$trs, na.rm = TRUE)) / (max(mcrt$trs, na.rm = TRUE) - min(mcrt$trs, na.rm = TRUE)) 
+# Squeeze values away from exact 0 and 1 (required for Beta likelihood)
+mcrt$trs_beta <- (mcrt$trs_beta * (nrow(mcrt) - 1) + 0.5) / nrow(mcrt)
 apoe_sex_mcrt <- run_apoe_sex_model_cohort(
   df = mcrt,
   apoe_col = "APOE_grouped",
   sex_col = "de_gender",                                 # Changed to primary stratifying variable
-  y_col = "trs",
+  y_col = "trs_beta",
   age_col = "clinical_AgefromBaseline",
   cohort = "cohort",
   reference_sex = "M",                                  
-  
+  family_choice = betar(link = "logit"),
   colour_values = c("#3399FF", "#33CC33", "#FF4D4D"),                                        # 3 colors mapped to APOE2, APOE3, APOE4 names
   k_val = 7,
   reference_cohort = NULL,
   XLIM = c(18, 72),
-  YLIM = c(0, 46)
+  YLIM = c(0, 5)
 )
 
 export_gam_summary_to_excel(
@@ -1442,9 +1671,15 @@ export_gam_summary_to_excel(
   file_path   = "./SuppMaterials/Supplemental_Table_mcrt_by_APOE_and_sex.xlsx", 
   model_label = "Supplemental Table X: GAM Trajectories of mCRT by APOE and Sex"
 )
+
+# Set layout to a 2x2 grid
+par(mfrow = c(2, 2))
+# Plot all diagnostic charts
+gam.check(apoe_sex_mcrt$model_obj)
+# Reset plotting layout back to standard 1x1
+par(mfrow = c(1, 1))
 lemon::grid_arrange_shared_legend(apoe_sex_CSF$plot, apoe_sex_CL$plot,
              apoe_sex_pTau217_DABNI$plot, apoe_sex_pTau217_ABCDS$plot,
              apoe_sex_GFAP$plot, apoe_sex_NFL$plot,
              apoe_sex_hippo$plot, apoe_sex_mcrt$plot, nrow = 4, ncol = 2)
 graph2ppt(file = "./figures/Fig2_SexStratified.pptx", width = 6, height = 11)
-

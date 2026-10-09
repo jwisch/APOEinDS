@@ -293,7 +293,9 @@ compare_sexes_by_apoe <- function(
   
   formula_gam <- as.formula(formula_str)
   mod <- gam(formula_gam, method = "REML", data = df)
-  
+  # ---- Capture gam.check Output ----
+  # Uses capture.output() and plot = FALSE to suppress unwanted window pop-ups during function execution
+  check_output <- capture.output(gam.check(mod, plot = FALSE))
   # ---- Prediction Grid Setup ----
   grid_list <- list(
     seq(min(df[[age_col]], na.rm = TRUE), max(df[[age_col]], na.rm = TRUE), by = 0.1),
@@ -467,7 +469,8 @@ compare_sexes_by_apoe <- function(
     predictions = mod_df,
     significance_summary = significance_summary,
     model_obj = mod,
-    z_value_used = z_crit
+    z_value_used = z_crit,
+    gam_check = check_output
   ))
 }
 
@@ -482,7 +485,8 @@ run_apoe_sex_model_cohort <- function(
     age_col = "clinical_AgefromBaseline",
     intellectual_disability_col = "Intellectual_Disability",
     cohort = "cohort",
-    colour_values,                                        # 3 colors mapped to APOE2, APOE3, APOE4 names
+    family_choice = gaussian(),
+    colour_values,                                         # 3 colors mapped to APOE2, APOE3, APOE4 names
     k_val = 4,
     reference_cohort = NULL,
     reference_sex = NULL,
@@ -518,7 +522,7 @@ run_apoe_sex_model_cohort <- function(
     }
   }
   
-  # UNCOMMENTED AND FIXED: Prepare Intellectual Disability column and baseline choice
+  # Prepare Intellectual Disability column and baseline choice
   if (!is.null(intellectual_disability_col) && intellectual_disability_col %in% colnames(df)) {
     df[[intellectual_disability_col]] <- factor(df[[intellectual_disability_col]])
     if (is.null(reference_id)) {
@@ -548,7 +552,11 @@ run_apoe_sex_model_cohort <- function(
   }
   
   formula_gam <- as.formula(formula_str)
-  mod <- gam(formula_gam, method = "REML", data = df)
+  mod <- gam(formula_gam, method = "REML", data = df, family = family_choice)
+  
+  # ---- Capture gam.check Output ----
+  # Uses capture.output() and plot = FALSE to suppress unwanted window pop-ups during function execution
+  check_output <- capture.output(gam.check(mod, plot = FALSE))
   
   # ---- Prediction Grid (Balanced at reference parameters) ----
   grid_list <- list(
@@ -563,7 +571,7 @@ run_apoe_sex_model_cohort <- function(
     grid_names <- c(grid_names, cohort)
   }
   
-  # ADDED: Include Intellectual Disability reference level in the prediction grid matrix
+  # Include Intellectual Disability reference level in the prediction grid matrix
   if (!is.null(intellectual_disability_col) && intellectual_disability_col %in% colnames(df)) {
     grid_list <- c(grid_list, list(reference_id))
     grid_names <- c(grid_names, intellectual_disability_col)
@@ -577,7 +585,7 @@ run_apoe_sex_model_cohort <- function(
     mod_df[[cohort]] <- factor(mod_df[[cohort]], levels = levels(df[[cohort]]))
   }
   
-  # ADDED: Enforce factor attributes on the grid column to match your model structure
+  # Enforce factor attributes on the grid column to match your model structure
   if (!is.null(intellectual_disability_col) && intellectual_disability_col %in% colnames(df)) {
     mod_df[[intellectual_disability_col]] <- factor(mod_df[[intellectual_disability_col]], levels = levels(df[[intellectual_disability_col]]))
   }
@@ -646,10 +654,10 @@ run_apoe_sex_model_cohort <- function(
   return(list(
     plot = p,
     predictions = mod_df,
-    model_obj = mod
+    model_obj = mod,
+    gam_check = check_output
   ))
 }
-
 
 run_apoe_model_cohort <- function(
     df,
@@ -661,6 +669,7 @@ run_apoe_model_cohort <- function(
     sex_col = NULL,                                        
     fill_values,
     colour_values,
+    family_choice = gaussian(),
     sig_bar_colors = c("sig_2_3" = "red", "sig_2_4" = "blue", "sig_3_4" = "green"),
     markSig = FALSE,
     k_val = 4,
@@ -727,7 +736,10 @@ run_apoe_model_cohort <- function(
   }
   
   formula_gam <- as.formula(formula_str)
-  mod <- gam(formula_gam, method = "REML", data = df)
+  mod <- gam(formula_gam, method = "REML", data = df, family = family_choice)
+  # ---- Capture gam.check Output ----
+  # Uses capture.output() and plot = FALSE to suppress unwanted window pop-ups during function execution
+  check_output <- capture.output(gam.check(mod, plot = FALSE))
   
   # ---- Prediction Grid Setup ----
   grid_list <- list(
@@ -852,6 +864,7 @@ run_apoe_model_cohort <- function(
   final_ylim <- if (is.numeric(YLIM) && length(YLIM) == 2) YLIM else NULL
   p <- p + coord_cartesian(xlim = final_xlim, ylim = final_ylim)
   
-  return(list(plot = p, predictions = mod_df, significance_summary = significance_summary, model_obj = mod))
+  return(list(plot = p, predictions = mod_df, significance_summary = significance_summary, model_obj = mod,
+              gam_check = check_output))
 }
 
